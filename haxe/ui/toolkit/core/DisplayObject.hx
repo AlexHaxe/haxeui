@@ -1,5 +1,6 @@
 package haxe.ui.toolkit.core;
 
+import openfl.geom.Point;
 import openfl.display.Graphics;
 import openfl.display.Sprite;
 import openfl.events.Event;
@@ -473,6 +474,9 @@ class DisplayObject implements IEventDispatcher implements IDisplayObject implem
 		var sy:Float = stageY;
 		xpos /= Toolkit.scaleFactor;
 		ypos /= Toolkit.scaleFactor;
+        var p : Point = root.sprite.localToGlobal (new Point (sx, sy));
+        sx = p.x;
+        sy = p.y;
 		if (xpos > sx && xpos < sx + width && ypos > sy && ypos < sy + height) {
 			b = true;
 		}
