@@ -6,6 +6,8 @@ import haxe.ui.toolkit.core.interfaces.IClonable;
 
 class GridLayout extends Layout implements IClonable<Layout> {
 	private var _columns:Int = 1;
+    private var calcedColumnWidths : Array<Float>;
+    private var calcedRowHeights : Array<Float>;
 	
 	public function new() {
 		super();
@@ -145,6 +147,10 @@ class GridLayout extends Layout implements IClonable<Layout> {
 	// Helpers
 	//******************************************************************************************
 	private function calcColumnWidths():Array<Float> {
+
+        if (calcedColumnWidths != null) {
+            return calcedColumnWidths;
+        }
 		var columnWidths:Array<Float> = new Array<Float>();
 		for (n in 0..._columns) {
 			columnWidths.push(0);
@@ -197,10 +203,15 @@ class GridLayout extends Layout implements IClonable<Layout> {
 			}
 		}
 		
+        calcedColumnWidths = columnWidths;
 		return columnWidths;
 	}
 	
 	public function calcRowHeights():Array<Float> {
+
+        if (calcedRowHeights != null) {
+            return calcedRowHeights;
+        }
 		
 		var visibleChildren = 0;
 		for (c in container.children) {
@@ -264,6 +275,13 @@ class GridLayout extends Layout implements IClonable<Layout> {
 				rowIndex++;
 			}
 		}
+        calcedRowHeights = rowHeights;
 		return rowHeights;
 	}
+
+    public function resetCalcCache():Void
+    {
+        calcedRowHeights = null;
+        calcedColumnWidths = null;
+    }
 }
