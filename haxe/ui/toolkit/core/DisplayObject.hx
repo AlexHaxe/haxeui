@@ -369,7 +369,6 @@ class DisplayObject implements IEventDispatcher implements IDisplayObject implem
 		return _sprite;
 	}
 	
-
 	private function get_stageX():Float {
 		var c:IDisplayObject = cast(this, IDisplayObject);
 		var xpos:Float = 0;
@@ -381,6 +380,7 @@ class DisplayObject implements IEventDispatcher implements IDisplayObject implem
 			c = c.parent;
 		}
 		//xpos -= root.x;
+        xpos += getRootOffsetX();
 		return xpos;
 	}
 
@@ -395,8 +395,19 @@ class DisplayObject implements IEventDispatcher implements IDisplayObject implem
 			c = c.parent;
 		}
 		//ypos -= root.y;
+        ypos += getRootOffsetY();
 		return ypos;
 	}
+
+    private function getRootOffsetX():Float {
+        var p:Point = root.sprite.localToGlobal(new Point(0, 0));
+        return p.x;
+    }
+
+    private function getRootOffsetY():Float {
+        var p:Point = root.sprite.localToGlobal(new Point(0, 0));
+        return p.y;
+    }
 
 	private function get_visible():Bool {
 		return _sprite.visible;
@@ -474,9 +485,6 @@ class DisplayObject implements IEventDispatcher implements IDisplayObject implem
 		var sy:Float = stageY;
 		xpos /= Toolkit.scaleFactor;
 		ypos /= Toolkit.scaleFactor;
-        var p : Point = root.sprite.localToGlobal (new Point (sx, sy));
-        sx = p.x;
-        sy = p.y;
 		if (xpos > sx && xpos < sx + width && ypos > sy && ypos < sy + height) {
 			b = true;
 		}
