@@ -3,11 +3,10 @@ package haxe.ui.toolkit.layout;
 import haxe.ui.toolkit.core.base.HorizontalAlign;
 import haxe.ui.toolkit.core.base.VerticalAlign;
 import haxe.ui.toolkit.core.interfaces.IClonable;
+import haxe.ui.toolkit.core.interfaces.IDisplayObjectContainer;
 
 class GridLayout extends Layout implements IClonable<Layout> {
 	private var _columns:Int = 1;
-    private var calcedColumnWidths : Array<Float>;
-    private var calcedRowHeights : Array<Float>;
 	
 	public function new() {
 		super();
@@ -84,6 +83,7 @@ class GridLayout extends Layout implements IClonable<Layout> {
 	private override function repositionChildren():Void {
 		super.repositionChildren();
 		
+		
 		var columnWidths:Array<Float> = calcColumnWidths();
 		var rowHeights:Array<Float> = calcRowHeights();
 		var rowIndex:Int = 0;
@@ -148,9 +148,6 @@ class GridLayout extends Layout implements IClonable<Layout> {
 	//******************************************************************************************
 	private function calcColumnWidths():Array<Float> {
 
-        if (calcedColumnWidths != null) {
-            return calcedColumnWidths;
-        }
 		var columnWidths:Array<Float> = new Array<Float>();
 		for (n in 0..._columns) {
 			columnWidths.push(0);
@@ -203,15 +200,11 @@ class GridLayout extends Layout implements IClonable<Layout> {
 			}
 		}
 		
-        calcedColumnWidths = columnWidths;
 		return columnWidths;
 	}
 	
 	public function calcRowHeights():Array<Float> {
 
-        if (calcedRowHeights != null) {
-            return calcedRowHeights;
-        }
 		
 		var visibleChildren = 0;
 		for (c in container.children) {
@@ -275,13 +268,6 @@ class GridLayout extends Layout implements IClonable<Layout> {
 				rowIndex++;
 			}
 		}
-        calcedRowHeights = rowHeights;
 		return rowHeights;
 	}
-
-    public function resetCalcCache():Void
-    {
-        calcedRowHeights = null;
-        calcedColumnWidths = null;
-    }
 }
