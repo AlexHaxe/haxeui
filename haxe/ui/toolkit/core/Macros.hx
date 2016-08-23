@@ -221,7 +221,7 @@ class Macros {
 						} else {
 							subDir = path + subDir;
 						}
-						
+
 						if (sys.FileSystem.isDirectory(subDir)) {
 							paths.insert(0, subDir);
 						} else {
@@ -258,20 +258,17 @@ class Macros {
 			var classPackage:String = c.get("package");
 			
 			var types:Array<haxe.macro.Type> = null;
-			
+
 			if (className != null) {
-				types = Context.getModule(className);
+				types = [Context.getType(className)];
 			} else if (classPackage != null) {
 				types = getTypesFromPackage(classPackage);
 			}
-			
+
 			if (types != null) {
 				for (t in types) {
 					if (hasInterface(t, "haxe.ui.toolkit.core.interfaces.IDisplayObject")) {
 						var resolvedClass:String = getClassNameFromType(t);
-						if (className != null && resolvedClass != className) {
-							continue;
-						}
 						if (classAlias == null) {
 							classAlias = resolvedClass.substr(resolvedClass.lastIndexOf(".") + 1, resolvedClass.length);
 						}
@@ -414,13 +411,13 @@ class Macros {
 		}
 
 		if (ctor == null) Context.error("A class building a controller must have a constructor", Context.currentPos());
-		
+
+		var relativePath = resourcePath;
 		resourcePath = resolveResource(resourcePath, Context.getClassPath());
 		if (sys.FileSystem.exists(resourcePath) == false) {
 			Context.error("XML file not found", Context.currentPos());
 		}
-		
-		var e:Expr = Context.parseInlineString("super(\"" + resourcePath + "\")", Context.currentPos());
+		var e:Expr = Context.parseInlineString("super(\"" + relativePath + "\")", Context.currentPos());
 		ctor.expr = switch(ctor.expr.expr) {
 			case EBlock(el): macro $b{insertExpr(el, 0, e)};
 			case _: macro $b { insertExpr([ctor.expr], 0, e) }
@@ -541,7 +538,7 @@ class Macros {
 		return superClass;
 	}
 	
-	private static function insertLine(fn, e:Expr, location:Int):Void {
+	private static function insertLine(fn:Function, e:Expr, location:Int):Void {
 		fn.expr = switch(fn.expr.expr) {
 			case EBlock(el): macro $b{insertExpr(el, location, e)};
 			case _: macro $b { insertExpr([fn.expr], location, e) }
@@ -555,6 +552,15 @@ class Macros {
 			arr.insert(pos, item);
 		}
 		return arr;
+	}
+
+	public static function removeStyleComments(styleString:String):String
+	{
+		return ~/\/\*[\w\s\{\}:;\-\(\),\.#%+\-\[\]]*\*\//g.map(styleString,
+			function(re:EReg):String
+			{
+				return "";
+			});
 	}
 	
 	macro public static function addStyleSheet(resourcePath:String):Expr {
@@ -570,6 +576,7 @@ class Macros {
 		}
 		
 		var contents:String = sys.io.File.getContent(resourcePath);
+		contents = removeStyleComments(contents);
 		var code:String = "function() {\n";
 		var arr:Array<String> = contents.split("}");
 		
@@ -647,7 +654,7 @@ class Macros {
 				if (StringTools.startsWith(propValue, "#")) { // lazyness
 					propValue = "0x" + propValue.substr(1, propValue.length - 1);
 				}
-				
+
 				code += "\t\t" + propName + ":" + propValue + ",\n";
 			}
 		}
@@ -752,6 +759,15 @@ class Macros {
 		var subs = ["/"];
 		var candidates:Array<String> = ["project.xml", "application.xml"];
 		for (c in candidates) {
+			#if macro
+			try {
+                if(!sys.FileSystem.exists(c)) {
+				    c = Context.resolvePath(c);
+                }
+			} catch (e:Dynamic) {
+                continue;
+            }
+            #end
 			if (sys.FileSystem.exists(c)) {
 				var xml:Xml = Xml.parse(sys.io.File.getContent(c));
 				var assetPaths:Array<String> = XmlUtil.getPathValues(xml.firstElement(), "/project/assets/@path");

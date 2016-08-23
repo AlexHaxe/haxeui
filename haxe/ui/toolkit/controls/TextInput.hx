@@ -99,7 +99,9 @@ class TextInput extends StateComponent implements IClonable<TextInput> {
 		#end
 		_textDisplay.display.removeEventListener(Event.CHANGE, _onTextChange);
 		_textDisplay.display.removeEventListener(Event.SCROLL, _onTextScroll);
-		sprite.removeChild(_textDisplay.display);
+        if (sprite.contains(_textDisplay.display)) {
+		    sprite.removeChild(_textDisplay.display);
+        }
 		if (_textPlaceHolder != null && contains(_textPlaceHolder)) {
 			removeChild(_textPlaceHolder);
 		}
@@ -170,6 +172,9 @@ class TextInput extends StateComponent implements IClonable<TextInput> {
 	private override function set_text(value:String):String {
 		value = super.set_text(value);
 		_textDisplay.text = value;
+		if (_textPlaceHolder != null) {
+			_textPlaceHolder.visible = (value.length == 0);
+		}
 		
 		return value;
 	}

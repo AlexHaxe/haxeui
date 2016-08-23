@@ -9,13 +9,13 @@
     "contributors": [
         "ianharrigan"
     ],
-    "releasenote": "Fixed issues with grid layout",
-    "version": "1.7.18",
+    "releasenote": "Haxe 3.3 compatibility",
+    "version": "1.8.20",
     "url": "https://github.com/ianharrigan/haxeui",
     "dependencies": {
-        "lime": "2.6.8",
-        "actuate": "1.8.6",
-        "openfl": "3.3.8",
-        "hscript": "2.0.4"
+        "lime": "2.9.1",
+        "actuate": "",
+        "openfl": "3.6.1",
+        "hscript": ""
     }
 }

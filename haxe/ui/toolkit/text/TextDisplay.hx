@@ -56,18 +56,22 @@ class TextDisplay implements ITextDisplay {
 	
 	private function set_text(value:String):String {
 		if (value != null) {
-			if (_tf.multiline == false) {
-				_tf.text = StringTools.replace(value, "\\n", "\n");
-			} else {
-				_tf.text = StringTools.replace(value, "\\n", "\n");
-			}
+            #if (html5 && dom)
+			value = StringTools.replace(value, "\\n", "\n");
+            if (multiline == true) {
+			    value = StringTools.replace(value, "\n", "<br/>");
+            }
+			_tf.text = value;
+            #else
+			_tf.text = StringTools.replace(value, "\\n", "\n");
+            #end
 		}
 		
 		style = _style;
 		
 		#if (html5 && !dom)
-		if (_tf.height - 2 != _tf.textHeight) {
-			_tf.height = _tf.textHeight - 2;
+		if (_tf.height != _tf.textHeight) {
+			_tf.height = _tf.textHeight + 2;
 		}
 		#end
 

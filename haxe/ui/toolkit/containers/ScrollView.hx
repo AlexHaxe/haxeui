@@ -1,5 +1,9 @@
 package haxe.ui.toolkit.containers;
 
+import haxe.ui.toolkit.controls.Text;
+import haxe.ui.toolkit.core.Component;
+import haxe.ui.toolkit.core.interfaces.IClonable;
+import haxe.ui.toolkit.core.interfaces.IComponent;
 import haxe.ui.toolkit.core.Toolkit;
 import openfl.display.DisplayObject;
 import openfl.display.Sprite;
@@ -33,7 +37,7 @@ class ScrollView extends StateComponent {
 
 	private var _inertiaSpeed:Point = new Point(0, 0);
 	private var _inertiaTime:Float;
-	private var _inertiaSensitivity:Float = 5;
+	private var _inertiaSensitivity:Float = 50;
 	private var _inertialScrolling:Bool = false;
 
 	#if mobile
@@ -101,6 +105,14 @@ class ScrollView extends StateComponent {
 		var r = null;
 		if (child == _container || child == _hscroll || child == _vscroll) {
 			r = super.addChild(child);
+		} else if (Std.is(child, ScrollViewRefreshPrompt)) {
+			_refreshPromptView = cast child;
+			_refreshPromptView.alpha = 0;
+			r = super.addChildAt(child, 0);
+		} else if (Std.is(child, ScrollViewRefreshing)) {
+			_refreshingView = cast child;
+			_refreshingView.visible = false;
+			r = super.addChildAt(child, 0);
 		} else {
 			if (_container.numChildren >= 1) {
 				trace("WARNING: ScrollView will only use the first child as the scroll content");
@@ -125,7 +137,7 @@ class ScrollView extends StateComponent {
 	
 	public override function removeChild(child:IDisplayObject, dispose:Bool = true):IDisplayObject {
 		var r = null;
-		if (child == _container || child == _hscroll || child == _vscroll) {
+		if (child == _container || child == _hscroll || child == _vscroll || child == _refreshPromptView || child == _refreshingView) {
 			r = super.removeChild(child, dispose);
 		} else {
 			r = _container.removeChild(child, dispose);
@@ -334,16 +346,24 @@ class ScrollView extends StateComponent {
 
 		if (content != null) {
 
-			_inertiaSpeed.x *= 0.8;
-			_inertiaSpeed.y *= 0.8;
+			var frameRate = openfl.Lib.current.stage.frameRate;
+
+			_inertiaSpeed.x -= _inertiaSpeed.x * (5.0 / frameRate);
+			_inertiaSpeed.y -= _inertiaSpeed.y * (5.0 / frameRate);
 
 			if ((content.width > layout.usableWidth || _virtualScrolling == true)) {
 				if (_showHScroll == true && _autoHideScrolls == true) {
 					_hscroll.visible = true;
 				}
 				if (_hscroll != null) {
-					_hscroll.pos -= _inertiaSpeed.x;
+					_hscroll.pos -= _inertiaSpeed.x / frameRate;
+
+					if (_inertiaSpeed.x < 0 && _hscroll.pos <= _hscroll.min || _inertiaSpeed.x > 0 && _hscroll.pos >= _hscroll.max) {
+						_inertiaSpeed.x = 0;
+					}
 				}
+			} else {
+				_inertiaSpeed.x = 0;
 			}
 
 			if ((content.height > layout.usableHeight || _virtualScrolling == true)) {
@@ -351,11 +371,17 @@ class ScrollView extends StateComponent {
 					_vscroll.visible = true;
 				}
 				if (_vscroll != null) {
-					_vscroll.pos -= _inertiaSpeed.y;
+					_vscroll.pos -= _inertiaSpeed.y / frameRate;
+
+					if (_inertiaSpeed.y > 0 && _vscroll.pos <= _vscroll.min || _inertiaSpeed.y < 0 && _vscroll.pos >= _vscroll.max) {
+						_inertiaSpeed.y = 0;
+					}
 				}
+			} else {
+				_inertiaSpeed.y = 0;
 			}
 
-			if ( Math.abs(_inertiaSpeed.x) < 0.1 && Math.abs(_inertiaSpeed.y) < 0.1 ){
+			if ( Math.abs(_inertiaSpeed.x) < 15 && Math.abs(_inertiaSpeed.y) < 15 ){
 				_eventTarget.visible = false;
 				if (_hscroll != null && _showHScroll == true && _autoHideScrolls == true) {
 					_hscroll.visible = false;
@@ -416,15 +442,18 @@ class ScrollView extends StateComponent {
 		
 		if ( _inertialScrolling == true ) {
 			Screen.instance.removeEventListener(Event.ENTER_FRAME, _onInertiaEnterFrame);
+			_inertiaSpeed.x = 0;
+			_inertiaSpeed.y = 0;
 			_inertiaTime = Lib.getTimer();
 		}
 
 		var content:IDisplayObject = _container.getChildAt(0); // assume first child is content
 		if (content != null && inScroll == false && _virtualScrolling == false) {
-			if (content.width > layout.usableWidth || content.height > layout.usableHeight) {
+			if (content.width > layout.usableWidth || content.height > layout.usableHeight || allowPull()) {
 				_downPos = new Point(event.stageX, event.stageY);
 				Screen.instance.addEventListener(MouseEvent.MOUSE_UP, _onScreenMouseUp);
 				Screen.instance.addEventListener(MouseEvent.MOUSE_MOVE, _onScreenMouseMove);
+				dispatchEvent(new UIEvent(UIEvent.SCROLL_START));
 			}
 		}
 		
@@ -432,7 +461,40 @@ class ScrollView extends StateComponent {
 			_downPos = new Point(event.stageX, event.stageY);
 			Screen.instance.addEventListener(MouseEvent.MOUSE_UP, _onScreenMouseUp);
 			Screen.instance.addEventListener(MouseEvent.MOUSE_MOVE, _onScreenMouseMove);
+			dispatchEvent(new UIEvent(UIEvent.SCROLL_START));
 		}
+	}
+	
+	private var _pulling:Bool = false;
+	
+	private var _refreshPromptView:ScrollViewRefreshPrompt;
+	private var _refreshString:String;
+	public var refreshString(get, set):String;
+	private function get_refreshString():String {
+		return _refreshString;
+	}
+	private function set_refreshString(value:String):String {
+		if (_refreshPromptView == null) {
+			_refreshPromptView = new DefaultScrollViewRefreshPrompt();
+			addChild(_refreshPromptView);
+		}
+		_refreshPromptView.text = value;
+		return value;
+	}
+	
+	private var _refreshingView:ScrollViewRefreshing;
+	private var _refreshingString:String;
+	public var refreshingString(get, set):String;
+	private function get_refreshingString():String {
+		return _refreshingString;
+	}
+	private function set_refreshingString(value:String):String {
+		if (_refreshingView == null) {
+			_refreshingView = new DefaultScrollViewRefreshing();
+			addChild(_refreshingView);
+		}
+		_refreshingView.text = value;
+		return value;
 	}
 	
 	private function _onScreenMouseMove(event:MouseEvent):Void {
@@ -449,16 +511,21 @@ class ScrollView extends StateComponent {
 			}
 
 			if ( _inertialScrolling == true ) {
-				var time:Float = (Lib.getTimer() - _inertiaTime)/100; // deciseconds
-				_inertiaSpeed = new Point ( xpos / time , ypos / time );
-				_inertiaTime = Lib.getTimer ();
+				var now = Lib.getTimer();
+				var delta = (now - _inertiaTime) / 1000; // seconds
+                if (delta == 0) {
+                    delta = 0.1;
+                }
+				_inertiaSpeed.x = _inertiaSpeed.x*0.3 + xpos*0.7 / delta;
+				_inertiaSpeed.y = _inertiaSpeed.y*0.3 + ypos*0.7 / delta;
+				_inertiaTime = now;
 			}
 			
 			if (Math.abs(xpos) >= _scrollSensitivity  || Math.abs(ypos) >= _scrollSensitivity) {
 				_eventTarget.visible = true;
 				var content:IDisplayObject = _container.getChildAt(0); // assume first child is content
 				if (content != null) {
-					if (xpos != 0 && (content.width > layout.usableWidth || _virtualScrolling == true)) {
+					if (xpos != 0 && (content.width > layout.usableWidth || _virtualScrolling == true) && _pulling == false) {
 						if (_showHScroll == true && _autoHideScrolls == true) {
 							_hscroll.visible = true;
 						}
@@ -467,7 +534,7 @@ class ScrollView extends StateComponent {
 						}
 					}
 					
-					if (ypos != 0 && (content.height > layout.usableHeight || _virtualScrolling == true)) {
+					if (ypos != 0 && (content.height > layout.usableHeight || _virtualScrolling == true) && _pulling == false) {
 						if (_showVScroll == true && _autoHideScrolls == true) {
 							_vscroll.visible = true;
 						}
@@ -476,10 +543,29 @@ class ScrollView extends StateComponent {
 						}
 					}
 					
+					if (allowPull()) {
+						_refreshingView.visible = false;
+						_pulling = true;
+						content.y += ypos;
+						if (content.y > _refreshPromptView.height) {
+							content.y = _refreshPromptView.height;
+						} else if (content.y < 0) {
+							content.y = 0;
+						}
+						_refreshPromptView.alpha = content.y / _refreshPromptView.height;
+					}
+					
 					_downPos = new Point(event.stageX, event.stageY);
 				}
 			}
 		}
+	}
+	
+	private function allowPull() {
+		if ((_vscroll == null || _vscroll.pos == 0) && _refreshPromptView != null) {
+			return true;
+		}
+		return false;
 	}
 	
 	private function _onScreenMouseUp(event:MouseEvent):Void {
@@ -500,6 +586,28 @@ class ScrollView extends StateComponent {
 		if (_vscroll != null && _showVScroll == true && _autoHideScrolls == true) {
 			_vscroll.visible = false;
 		}
+
+		dispatchEvent(new UIEvent(UIEvent.SCROLL_STOP));
+		
+		if (_pulling == true && _refreshPromptView != null) {
+			if (_refreshPromptView.alpha < 1) {
+				_pulling = false;
+				_refreshPromptView.alpha = 0;
+				_refreshingView.visible = false;
+				this.invalidate();
+			} else {
+				_refreshPromptView.alpha = 0;
+				_refreshingView.visible = true;
+				dispatchEvent(new UIEvent(UIEvent.REFRESH));
+			}
+		}
+	}
+	
+	public function refreshComplete():Void {
+		_pulling = false;
+		_refreshPromptView.alpha = 0;
+		_refreshingView.visible = false;
+		this.invalidate();
 	}
 	
 	//******************************************************************************************
@@ -598,6 +706,12 @@ class ScrollView extends StateComponent {
 			_hscroll.id = "hscroll";
 			_hscroll.percentWidth = 100;
 			_hscroll.addEventListener(Event.CHANGE, _onHScrollChange);
+			_hscroll.addEventListener(UIEvent.SCROLL_START, function(event):Void {
+				dispatchEvent(new UIEvent(UIEvent.SCROLL_START));
+			});
+			_hscroll.addEventListener(UIEvent.SCROLL_STOP, function(event):Void {
+				dispatchEvent(new UIEvent(UIEvent.SCROLL_STOP));
+			});
 			if (_showHScroll == false) {
 				_hscroll.visible = false;
 			} else if (_autoHideScrolls == true) {
@@ -627,6 +741,12 @@ class ScrollView extends StateComponent {
 			_vscroll.id = "vscroll";
 			_vscroll.percentHeight = 100;
 			_vscroll.addEventListener(Event.CHANGE, _onVScrollChange);
+			_vscroll.addEventListener(UIEvent.SCROLL_START, function(event):Void {
+				dispatchEvent(new UIEvent(UIEvent.SCROLL_START));
+			});
+			_vscroll.addEventListener(UIEvent.SCROLL_STOP, function(event):Void {
+				dispatchEvent(new UIEvent(UIEvent.SCROLL_STOP));
+			});
 			if (_showVScroll == false) {
 				_vscroll.visible = false;
 			} else if (_autoHideScrolls == true) {
@@ -692,6 +812,60 @@ class ScrollView extends StateComponent {
 		_eventTarget.graphics.lineStyle(0);
 		_eventTarget.graphics.drawRect(targetX, targetY, targetCX, targetCY);
 		_eventTarget.graphics.endFill();
+	}
+}
+
+@:dox(hide)
+class ScrollViewRefreshPrompt extends VBox implements IComponent implements IClonable<VBox> {
+	public function new() {
+		super();
+	}
+	
+}
+
+@:dox(hide)
+class DefaultScrollViewRefreshPrompt extends ScrollViewRefreshPrompt {
+	private var _textComponent:Text;
+	public function new() {
+		super();
+		text = "Release to refresh";
+	}
+	
+	private override function set_text(value:String):String {
+		value = super.set_text(value);
+		if (_textComponent == null) {
+			_textComponent = new Text();
+			addChild(_textComponent);
+		}
+		_textComponent.text = value;
+		return value;
+	}
+}
+
+@:dox(hide)
+class ScrollViewRefreshing extends VBox implements IComponent implements IClonable<VBox> {
+	public function new() {
+		super();
+	}
+	
+}
+
+@:dox(hide)
+class DefaultScrollViewRefreshing extends ScrollViewRefreshing {
+	private var _textComponent:Text;
+	public function new() {
+		super();
+		text = "Refreshing";
+	}
+	
+	private override function set_text(value:String):String {
+		value = super.set_text(value);
+		if (_textComponent == null) {
+			_textComponent = new Text();
+			addChild(_textComponent);
+		}
+		_textComponent.text = value;
+		return value;
 	}
 }
 
