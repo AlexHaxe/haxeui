@@ -326,7 +326,7 @@ class ListSelector extends Button implements IDataComponent {
 		if (mouseInList == false && _list != null && mouseIn == false) {
 			root.removeEventListener(MouseEvent.MOUSE_DOWN, _onRootMouseDown);
 			root.removeEventListener(MouseEvent.MOUSE_WHEEL, _onRootMouseDown);
-			hideList();
+			//hideList();
 		}
 	}
 	
